@@ -4,20 +4,23 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vehicle Trajectories in Salzburg</title>
-    <!-- deck.gl & MapLibre -->
+    <title>Road AverageSpeed Visualization</title>
+
+    <!-- deck.gl & MapLibre GL -->
     <script src="https://unpkg.com/deck.gl@8.9.30/dist.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" />
+    <link href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
+
     <!-- noUiSlider -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+
     <style>
         body {
             margin: 0;
-            font-family: sans-serif;
             background: #000;
             color: #fff;
+            font-family: sans-serif;
         }
 
         #map {
@@ -46,14 +49,14 @@
             border: 1px solid #555;
             background: #111;
             color: #fff;
-            margin-top: 4px;
+            margin-top: 6px;
             margin-bottom: 12px;
         }
 
         #time-range-labels {
             text-align: center;
             margin-bottom: 12px;
-            font-size: 14px;
+            font-size: 17px;
         }
 
         #slider {
@@ -66,11 +69,10 @@
 
         .noUi-horizontal .noUi-handle {
             background: #fff;
+            width: 25px;
             border: 1px solid #888;
-            box-shadow: none;
         }
 
-        /* hover popup */
         #popup {
             position: absolute;
             z-index: 201;
@@ -78,10 +80,36 @@
             color: #fff;
             padding: 8px 10px;
             border-radius: 4px;
-            font-size: 15px;
+            font-size: 14px;
             pointer-events: none;
             white-space: nowrap;
             display: none;
+        }
+
+        #viewTabs {
+            display: flex;
+            margin-bottom: 12px;
+        }
+
+        #viewTabs button {
+            flex: 1;
+            padding: 8px;
+            background: #222;
+            color: #ccc;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px;
+        }
+
+        #viewTabs button.active {
+            background: #26a69a;
+            color: #000;
+            font-weight: bold;
+        }
+
+        #viewTabs button+button {
+            margin-left: 4px;
         }
     </style>
 </head>
@@ -89,6 +117,10 @@
 <body>
 
     <div id="controls">
+        <div id="viewTabs">
+            <button id="tabRoad" class="active">Road View</button>
+            <button id="tabTraj">Trajectory View</button>
+        </div>
         <label for="stationType">Station Type:</label>
         <select id="stationType">
             <option value="all">All</option>
@@ -99,7 +131,7 @@
 
         <div id="time-range-labels">
             <label>Time Range</label><br />
-            <span id="min-time">--:--:--</span> &mdash; <span id="max-time">--:--:--</span>
+            <span id="min-time">--:--:--</span> — <span id="max-time">--:--:--</span>
         </div>
         <div id="slider"></div>
 
@@ -110,11 +142,9 @@
 
     <script>
         const INITIAL_VIEW_STATE = { latitude: 47.7, longitude: 13.05, zoom: 10, pitch: 0, bearing: 0 };
+        const STATION_TYPE_NAMES = { 5: 'Passenger Car', 6: 'Bus', 10: 'Other' };
 
-        function formatTime(ms) {
-            return new Date(ms).toTimeString().slice(0, 8);
-        }
-
+        function formatTime(ms) { return new Date(ms).toTimeString().slice(0, 8); }
         function getSpeedColor(s) {
             if (s < 2) return [255, 0, 0];
             if (s < 6) return [255, 165, 0];
@@ -122,75 +152,38 @@
             return [0, 255, 0];
         }
 
-        async function loadAll() {
-            const files = [
-                'Data/cams_04_07_7-8/cams_04_07_7-8_1_filtered.json',
-                'Data/cams_04_07_7-8/cams_04_07_7-8_2_filtered.json',
-                'Data/cams_04_07_7-8/cams_04_07_7-8_3_filtered.json'
-            ];
-            const arrs = await Promise.all(files.map(p => fetch(p).then(r => r.json())));
-            return arrs.flat();
-        }
+        let roadsGeo, segments, deckgl, slider, timeRange;
 
-        function groupSegments(data, st, [t0, t1]) {
-            const byId = {};
-            data.forEach(p => {
-                if ((st !== 'all' && p.stationType != st) || p.timestamp < t0 || p.timestamp > t1) return;
-                (byId[p.stationID] || (byId[p.stationID] = [])).push(p);
-            });
-            const segs = [], maxDist = 500, maxDt = 10000;
-            for (const id in byId) {
-                const pts = byId[id].sort((a, b) => a.timestamp - b.timestamp);
-                let seg = [pts[0]];
-                for (let i = 1; i < pts.length; i++) {
-                    const a = pts[i - 1], b = pts[i];
-                    const toRad = d => d * Math.PI / 180;
-                    const dLat = toRad(b.latitude - a.latitude),
-                        dLon = toRad(b.longitude - a.longitude);
-                    const A = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
-                    const dist = 6371000 * 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)),
-                        dt = b.timestamp - a.timestamp;
-                    if (dist <= maxDist && dt <= maxDt) seg.push(b);
-                    else {
-                        if (seg.length > 1) segs.push(seg);
-                        seg = [b];
-                    }
-                }
-                if (seg.length > 1) segs.push(seg);
-            }
-            return segs.map(seg => ({
-                coordinates: seg.map(p => [p.longitude, p.latitude]),
-                speed: seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length,
-                stationID: seg[0].stationID,
-                stationType: seg[0].stationType,
-                timestamp: seg[0].timestamp
-            }));
+        // load both roads and precomputed segments
+        async function loadData() {
+            const [r, s] = await Promise.all([
+                fetch('Data/roads.geojson').then(r => r.json()),
+                fetch('Data/segments.json').then(r => r.json())
+            ]);
+            return { roadsGeo: r, segments: s };
         }
-
-        let rawData, deckgl, slider, timeRange;
 
         async function main() {
-            rawData = await loadAll();
-            const times = rawData.map(p => p.timestamp),
-                tmin = Math.min(...times), tmax = Math.max(...times);
+            initTabs();
+            ({ roadsGeo, segments } = await loadData());
+
+            // compute global timeRange from segments.timestamps[]
+            const allTimes = segments.flatMap(s => s.timestamps || []);
+            const tmin = Math.min(...allTimes), tmax = Math.max(...allTimes);
             timeRange = [tmin, tmax];
 
+            // init slider
             slider = noUiSlider.create(document.getElementById('slider'), {
-                start: [tmin, tmax],
-                connect: true,
-                range: { min: tmin, max: tmax },
-                step: 1000,
+                start: [tmin, tmax], connect: true,
+                range: { min: tmin, max: tmax }, step: 1000,
                 tooltips: false,
                 pips: {
-                    mode: 'count',
-                    values: 3,
-                    format: { to: v => formatTime(v), from: v => Number(v) }
+                    mode: 'count', values: 3,
+                    format: { to: v => formatTime(v), from: v => +v }
                 }
             });
-
             document.getElementById('min-time').textContent = formatTime(tmin);
             document.getElementById('max-time').textContent = formatTime(tmax);
-
             slider.on('update', vals => {
                 timeRange = vals.map(v => +v);
                 document.getElementById('min-time').textContent = formatTime(timeRange[0]);
@@ -198,6 +191,7 @@
             });
             slider.on('change', render);
 
+            // init DeckGL
             deckgl = new deck.DeckGL({
                 container: 'map',
                 mapLib: maplibregl,
@@ -208,50 +202,93 @@
             });
 
             document.getElementById('stationType').addEventListener('change', render);
+
             render();
         }
 
         function render() {
             const st = document.getElementById('stationType').value;
-            const segs = groupSegments(rawData, st, timeRange);
             const popup = document.getElementById('popup');
 
-            const STATION_TYPE_NAMES = {
-                5: 'Passenger Car',
-                6: 'Bus',
-                10: 'Other'
+            // 1) 重建 speedMap：只聚合符合 stationType & 时间范围的 segments
+            const speedMap = {};
+            const countMap = {};
+            segments.forEach(s => {
+                if (st !== 'all' && String(s.stationType) !== st) return;
+                if (!s.timestamps.some(t => t >= timeRange[0] && t <= timeRange[1])) return;
+                const k = s.way_id;
+                speedMap[k] = (speedMap[k] || 0) + s.speed;
+                countMap[k] = (countMap[k] || 0) + 1;
+            });
+            Object.keys(speedMap).forEach(k => speedMap[k] /= countMap[k]);
+
+            // 2) 过滤出有数据的道路 Feature
+            const filteredRoads = {
+                type: 'FeatureCollection',
+                features: roadsGeo.features.filter(f => {
+                    const id = f.properties['@id'] || f.properties.id;
+                    return speedMap[id] !== undefined;
+                })
             };
 
-            const layer = new deck.PathLayer({
-                id: 'paths',
-                data: segs,
+            // 3) 用 GeoJsonLayer 渲染这些道路
+            const layer = new deck.GeoJsonLayer({
+                id: 'roads',
+                data: filteredRoads,
                 pickable: true,
-                getPath: d => d.coordinates,
-                getColor: d => getSpeedColor(d.speed),
-                getWidth: 2,
-                widthMinPixels: 2,
+                getLineWidth: 2,
+                lineWidthMinPixels: 2,
+                lineJointRounded: true,
+                lineCapRounded: true,
+                getLineColor: f => {
+                    const id = f.properties['@id'] || f.properties.id;
+                    return getSpeedColor(speedMap[id]);
+                },
                 onHover: ({ object, x, y }) => {
-                    if (object) {
-                        const name = STATION_TYPE_NAMES[object.stationType] || 'Unknown';
-                        popup.style.display = 'block';
-                        popup.style.left = `${x + 10}px`;
-                        popup.style.top = `${y + 10}px`;
-                        popup.innerHTML =
-                            `<strong>StationID:</strong> ${object.stationID}<br/>` +
-                            `<strong>StationType:</strong> ${name}<br/>` +
-                            `<strong>TimeStamp:</strong> ${formatTime(object.timestamp)}<br/>` +
-                            `<strong>Avg Speed:</strong> ${object.speed.toFixed(2)} m/s`;
-                    } else {
+                    if (!object) {
                         popup.style.display = 'none';
+                        return;
                     }
+                    const props = object.properties;
+                    const id = props['@id'] || props.id;
+                    const avg = speedMap[id];
+                    const roadName = props.name || id;
+                    popup.style.display = 'block';
+                    popup.style.left = `${x + 10}px`;
+                    popup.style.top = `${y + 10}px`;
+                    popup.innerHTML = `
+        <strong>Road Name:</strong> ${roadName}<br/>
+        <strong>Vehicle Number:</strong> ${countMap[id]}<br/>
+        <strong>Avg Speed:</strong> ${avg.toFixed(2)} m/s
+      `;
                 }
             });
 
             deckgl.setProps({ layers: [layer] });
         }
 
+        function initTabs() {
+            const tabRoad = document.getElementById('tabRoad');
+            const tabTraj = document.getElementById('tabTraj');
+            tabRoad.addEventListener('click', () => {
+                // 切换 highlight
+                tabRoad.classList.add('active');
+                tabTraj.classList.remove('active');
+                // 跳转到 road 页面（如果当前就是 road，可去掉）
+                window.location.href = 'index.html';
+            });
+            tabTraj.addEventListener('click', () => {
+                tabTraj.classList.add('active');
+                tabRoad.classList.remove('active');
+                window.location.href = 'trajectories.html';
+            });
+        }
+
+
+
         main();
     </script>
+
 </body>
 
 </html>
