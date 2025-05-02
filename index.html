@@ -5,9 +5,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vehicle Trajectories in Salzburg</title>
+    <!-- deck.gl & MapLibre -->
     <script src="https://unpkg.com/deck.gl@8.9.30/dist.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" />
     <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
+    <!-- noUiSlider -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -26,127 +30,224 @@
         #controls {
             position: absolute;
             top: 10px;
-            left: 10px;
-            z-index: 100;
+            left: 20px;
+            z-index: 200;
             background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
+            padding: 16px;
             border-radius: 8px;
+            width: 320px;
         }
 
-        #controls select {
-            padding: 4px;
+        #stationType {
+            width: 100%;
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background: #111;
+            color: #fff;
+            margin-top: 4px;
+            margin-bottom: 12px;
+        }
+
+        #time-range-labels {
+            text-align: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        #slider {
+            margin: 12px 0;
+        }
+
+        .noUi-connect {
+            background: #26a69a;
+        }
+
+        .noUi-horizontal .noUi-handle {
+            background: #fff;
+            border: 1px solid #888;
+            box-shadow: none;
+        }
+
+        /* hover popup */
+        #popup {
+            position: absolute;
+            z-index: 201;
+            background: rgba(135, 135, 135, 0.9);
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 15px;
+            pointer-events: none;
+            white-space: nowrap;
+            display: none;
         }
     </style>
 </head>
 
 <body>
+
     <div id="controls">
-        <label for="stationType">Filter by Station Type:</label>
+        <label for="stationType">Station Type:</label>
         <select id="stationType">
             <option value="all">All</option>
             <option value="5">Passenger Car</option>
             <option value="6">Bus</option>
             <option value="10">Other</option>
         </select>
+
+        <div id="time-range-labels">
+            <label>Time Range</label><br />
+            <span id="min-time">--:--:--</span> &mdash; <span id="max-time">--:--:--</span>
+        </div>
+        <div id="slider"></div>
+
     </div>
+
     <div id="map"></div>
+    <div id="popup"></div>
 
     <script>
-        const INITIAL_VIEW_STATE = {
-            latitude: 47.7,
-            longitude: 13.05,
-            zoom: 10,
-            pitch: 0,
-            bearing: 0
-        };
+        const INITIAL_VIEW_STATE = { latitude: 47.7, longitude: 13.05, zoom: 10, pitch: 0, bearing: 0 };
 
-        function getSpeedColor(speed) {
-            if (speed < 2) return [255, 0, 0];
-            if (speed < 6) return [255, 165, 0];
-            if (speed < 12) return [255, 255, 0];
+        function formatTime(ms) {
+            return new Date(ms).toTimeString().slice(0, 8);
+        }
+
+        function getSpeedColor(s) {
+            if (s < 2) return [255, 0, 0];
+            if (s < 6) return [255, 165, 0];
+            if (s < 12) return [255, 255, 0];
             return [0, 255, 0];
         }
 
-        function groupPaths(data, stationType) {
-            const grouped = {};
-            data.forEach(d => {
-                if (stationType !== 'all' && d.stationType != stationType) return;
-                if (!grouped[d.stationID]) grouped[d.stationID] = [];
-                grouped[d.stationID].push(d);
-            });
-
-            const segments = [];
-            const maxDist = 500;       // meters
-            const maxTime = 10000;     // ms
-            for (const id in grouped) {
-                const pts = grouped[id].sort((a, b) => a.timestamp - b.timestamp);
-                let seg = [pts[0]];
-                for (let i = 1; i < pts.length; i++) {
-                    const prev = pts[i - 1], curr = pts[i];
-                    const dist = (function (lat1, lon1, lat2, lon2) { const R = 6371000; const toRad = d => d * Math.PI / 180; const dLat = toRad(lat2 - lat1); const dLon = toRad(lon2 - lon1); const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); })(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
-                    const dt = curr.timestamp - prev.timestamp;
-                    if (dist <= maxDist && dt <= maxTime) {
-                        seg.push(curr);
-                    } else {
-                        if (seg.length > 1) {
-                            const coords = seg.map(p => [p.longitude, p.latitude]);
-                            const avgSp = seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length;
-                            segments.push({ coordinates: coords, speed: avgSp });
-                        }
-                        seg = [curr];
-                    }
-                }
-                if (seg.length > 1) {
-                    const coords = seg.map(p => [p.longitude, p.latitude]);
-                    const avgSp = seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length;
-                    segments.push({ coordinates: coords, speed: avgSp });
-                }
-            }
-            return segments;
-        }
-
-        async function loadAllCamData() {
+        async function loadAll() {
             const files = [
                 'Data/cams_04_07_7-8/cams_04_07_7-8_1_filtered.json',
                 'Data/cams_04_07_7-8/cams_04_07_7-8_2_filtered.json',
                 'Data/cams_04_07_7-8/cams_04_07_7-8_3_filtered.json'
             ];
-            const arrays = await Promise.all(
-                files.map(path => fetch(path).then(res => res.json()))
-            );
-            return arrays.flat();
+            const arrs = await Promise.all(files.map(p => fetch(p).then(r => r.json())));
+            return arrs.flat();
         }
 
-        async function main() {
-            const rawData = await loadAllCamData();
+        function groupSegments(data, st, [t0, t1]) {
+            const byId = {};
+            data.forEach(p => {
+                if ((st !== 'all' && p.stationType != st) || p.timestamp < t0 || p.timestamp > t1) return;
+                (byId[p.stationID] || (byId[p.stationID] = [])).push(p);
+            });
+            const segs = [], maxDist = 500, maxDt = 10000;
+            for (const id in byId) {
+                const pts = byId[id].sort((a, b) => a.timestamp - b.timestamp);
+                let seg = [pts[0]];
+                for (let i = 1; i < pts.length; i++) {
+                    const a = pts[i - 1], b = pts[i];
+                    const toRad = d => d * Math.PI / 180;
+                    const dLat = toRad(b.latitude - a.latitude),
+                        dLon = toRad(b.longitude - a.longitude);
+                    const A = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+                    const dist = 6371000 * 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)),
+                        dt = b.timestamp - a.timestamp;
+                    if (dist <= maxDist && dt <= maxDt) seg.push(b);
+                    else {
+                        if (seg.length > 1) segs.push(seg);
+                        seg = [b];
+                    }
+                }
+                if (seg.length > 1) segs.push(seg);
+            }
+            return segs.map(seg => ({
+                coordinates: seg.map(p => [p.longitude, p.latitude]),
+                speed: seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length,
+                stationID: seg[0].stationID,
+                stationType: seg[0].stationType,
+                timestamp: seg[0].timestamp
+            }));
+        }
 
-            const deckgl = new deck.DeckGL({
+        let rawData, deckgl, slider, timeRange;
+
+        async function main() {
+            rawData = await loadAll();
+            const times = rawData.map(p => p.timestamp),
+                tmin = Math.min(...times), tmax = Math.max(...times);
+            timeRange = [tmin, tmax];
+
+            slider = noUiSlider.create(document.getElementById('slider'), {
+                start: [tmin, tmax],
+                connect: true,
+                range: { min: tmin, max: tmax },
+                step: 1000,
+                tooltips: false,
+                pips: {
+                    mode: 'count',
+                    values: 3,
+                    format: { to: v => formatTime(v), from: v => Number(v) }
+                }
+            });
+
+            document.getElementById('min-time').textContent = formatTime(tmin);
+            document.getElementById('max-time').textContent = formatTime(tmax);
+
+            slider.on('update', vals => {
+                timeRange = vals.map(v => +v);
+                document.getElementById('min-time').textContent = formatTime(timeRange[0]);
+                document.getElementById('max-time').textContent = formatTime(timeRange[1]);
+            });
+            slider.on('change', render);
+
+            deckgl = new deck.DeckGL({
                 container: 'map',
-                map: maplibregl,
+                mapLib: maplibregl,
                 mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 initialViewState: INITIAL_VIEW_STATE,
                 controller: true,
-                layers: []
+                getCursor: ({ isHovering }) => isHovering ? 'pointer' : 'grab'
             });
 
-            function renderLayer(stationType) {
-                const paths = groupPaths(rawData, stationType);
-                const layer = new deck.PathLayer({
-                    id: 'vehicle-paths',
-                    data: paths,
-                    getPath: d => d.coordinates,
-                    getColor: d => getSpeedColor(d.speed),
-                    getWidth: 2,
-                    widthMinPixels: 2
-                });
-                deckgl.setProps({ layers: [layer] });
-            }
+            document.getElementById('stationType').addEventListener('change', render);
+            render();
+        }
 
-            document.getElementById('stationType').addEventListener('change', e => {
-                renderLayer(e.target.value);
+        function render() {
+            const st = document.getElementById('stationType').value;
+            const segs = groupSegments(rawData, st, timeRange);
+            const popup = document.getElementById('popup');
+
+            const STATION_TYPE_NAMES = {
+                5: 'Passenger Car',
+                6: 'Bus',
+                10: 'Other'
+            };
+
+            const layer = new deck.PathLayer({
+                id: 'paths',
+                data: segs,
+                pickable: true,
+                getPath: d => d.coordinates,
+                getColor: d => getSpeedColor(d.speed),
+                getWidth: 2,
+                widthMinPixels: 2,
+                onHover: ({ object, x, y }) => {
+                    if (object) {
+                        const name = STATION_TYPE_NAMES[object.stationType] || 'Unknown';
+                        popup.style.display = 'block';
+                        popup.style.left = `${x + 10}px`;
+                        popup.style.top = `${y + 10}px`;
+                        popup.innerHTML =
+                            `<strong>StationID:</strong> ${object.stationID}<br/>` +
+                            `<strong>StationType:</strong> ${name}<br/>` +
+                            `<strong>TimeStamp:</strong> ${formatTime(object.timestamp)}<br/>` +
+                            `<strong>Avg Speed:</strong> ${object.speed.toFixed(2)} m/s`;
+                    } else {
+                        popup.style.display = 'none';
+                    }
+                }
             });
 
-            renderLayer('all');
+            deckgl.setProps({ layers: [layer] });
         }
 
         main();
