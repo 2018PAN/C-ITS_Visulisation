@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vehicle Trajectories (Carto + deck.gl)</title>
+    <script src="https://unpkg.com/deck.gl@8.9.30/dist.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" />
+    <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            background: #000;
+            color: #fff;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        #controls select {
+            padding: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <label for="stationType">Filter by Station Type:</label>
+        <select id="stationType">
+            <option value="all">All</option>
+            <option value="5">Passenger Car</option>
+            <option value="6">Bus</option>
+            <option value="10">Other</option>
+        </select>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        const INITIAL_VIEW_STATE = {
+            latitude: 47.7,
+            longitude: 13.05,
+            zoom: 10,
+            pitch: 0,
+            bearing: 0
+        };
+
+        function getSpeedColor(speed) {
+            if (speed < 2) return [255, 0, 0];
+            if (speed < 6) return [255, 165, 0];
+            if (speed < 12) return [255, 255, 0];
+            return [0, 255, 0];
+        }
+
+        function groupPaths(data, stationType) {
+            const grouped = {};
+            data.forEach(d => {
+                if (stationType !== 'all' && d.stationType != stationType) return;
+                if (!grouped[d.stationID]) grouped[d.stationID] = [];
+                grouped[d.stationID].push(d);
+            });
+
+            const segments = [];
+            const maxDist = 500;       // meters
+            const maxTime = 10000;     // ms
+            for (const id in grouped) {
+                const pts = grouped[id].sort((a, b) => a.timestamp - b.timestamp);
+                let seg = [pts[0]];
+                for (let i = 1; i < pts.length; i++) {
+                    const prev = pts[i - 1], curr = pts[i];
+                    const dist = (function (lat1, lon1, lat2, lon2) { const R = 6371000; const toRad = d => d * Math.PI / 180; const dLat = toRad(lat2 - lat1); const dLon = toRad(lon2 - lon1); const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); })(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+                    const dt = curr.timestamp - prev.timestamp;
+                    if (dist <= maxDist && dt <= maxTime) {
+                        seg.push(curr);
+                    } else {
+                        if (seg.length > 1) {
+                            const coords = seg.map(p => [p.longitude, p.latitude]);
+                            const avgSp = seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length;
+                            segments.push({ coordinates: coords, speed: avgSp });
+                        }
+                        seg = [curr];
+                    }
+                }
+                if (seg.length > 1) {
+                    const coords = seg.map(p => [p.longitude, p.latitude]);
+                    const avgSp = seg.reduce((s, p) => s + p.speed_m_s, 0) / seg.length;
+                    segments.push({ coordinates: coords, speed: avgSp });
+                }
+            }
+            return segments;
+        }
+
+        async function loadAllCamData() {
+            const files = [
+                'Data/cams_04_07_7-8/cams_04_07_7-8_1_filtered.json',
+                'Data/cams_04_07_7-8/cams_04_07_7-8_2_filtered.json',
+                'Data/cams_04_07_7-8/cams_04_07_7-8_3_filtered.json'
+            ];
+            const arrays = await Promise.all(
+                files.map(path => fetch(path).then(res => res.json()))
+            );
+            return arrays.flat();
+        }
+
+        async function main() {
+            const rawData = await loadAllCamData();
+
+            const deckgl = new deck.DeckGL({
+                container: 'map',
+                map: maplibregl,
+                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                initialViewState: INITIAL_VIEW_STATE,
+                controller: true,
+                layers: []
+            });
+
+            function renderLayer(stationType) {
+                const paths = groupPaths(rawData, stationType);
+                const layer = new deck.PathLayer({
+                    id: 'vehicle-paths',
+                    data: paths,
+                    getPath: d => d.coordinates,
+                    getColor: d => getSpeedColor(d.speed),
+                    getWidth: 2,
+                    widthMinPixels: 2
+                });
+                deckgl.setProps({ layers: [layer] });
+            }
+
+            document.getElementById('stationType').addEventListener('change', e => {
+                renderLayer(e.target.value);
+            });
+
+            renderLayer('all');
+        }
+
+        main();
+    </script>
+</body>
+
+</html>
