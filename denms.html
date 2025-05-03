@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DENM Events Visualization</title>
+
+    <!-- deck.gl & MapLibre GL -->
+    <script src="https://unpkg.com/deck.gl@8.9.30/dist.min.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
+
+    <!-- noUiSlider -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 16px 36px;
+            padding-bottom: 40px;
+            border-radius: 8px;
+            width: 320px;
+            overflow: hidden;
+        }
+
+        #viewTabs {
+            display: flex;
+            margin-bottom: 12px;
+        }
+
+        #viewTabs button {
+            flex: 1;
+            padding: 8px;
+            background: #222;
+            color: #ccc;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px;
+        }
+
+        #viewTabs button.active {
+            background: #26a69a;
+            color: #000;
+            font-weight: bold;
+        }
+
+        #viewTabs button+button {
+            margin-left: 4px;
+        }
+
+        #controls label {
+            display: inline-block;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+
+        #time-range-labels {
+            text-align: center;
+            margin-bottom: 12px;
+            font-size: 17px;
+            margin-top: 20px;
+        }
+
+        #slider {
+            margin: 12px 0;
+        }
+
+        .noUi-connect {
+            background: #26a69a;
+        }
+
+        .noUi-horizontal .noUi-handle {
+            background: #fff;
+            width: 25px;
+            border: 1px solid #888;
+        }
+
+        #popup {
+            position: absolute;
+            z-index: 300;
+            background: rgba(50, 50, 50, 0.9);
+            color: #fff;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            pointer-events: none;
+            white-space: nowrap;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <div id="viewTabs">
+            <button id="tabRoad">Road View</button>
+            <button id="tabTraj">Trajectory View</button>
+            <button id="tabDenm" class="active">DENM View</button>
+        </div>
+        <label><input type="checkbox" id="showEvents" checked> Show Events</label>
+        <label><input type="checkbox" id="showTraces" checked> Show Traces</label>
+
+        <div id="time-range-labels">
+            <label>Time Range(2025-04-07)</label><br />
+            <span id="min-time">--:--:--</span> &mdash; <span id="max-time">--:--:--</span>
+        </div>
+        <div id="slider"></div>
+    </div>
+
+    <div id="map"></div>
+    <div id="popup"></div>
+
+    <script>
+        const INITIAL_VIEW_STATE = {
+            latitude: 47.7, longitude: 13.05, zoom: 10, pitch: 0, bearing: 0
+        };
+
+        function hhmmss(ms) {
+            const d = new Date(ms);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${hh}:${mm}:${ss}`;
+        }
+
+        async function loadDenms() {
+            const paths = [
+                'Data/denms_04_07-8/denms_04_07-8_1.json',
+                'Data/denms_04_07-8/denms_04_07-8_2.json',
+                'Data/denms_04_07-8/denms_04_07-8_3.json'
+            ];
+            const arrs = await Promise.all(paths.map(p => fetch(p).then(r => r.json())));
+            return arrs.flat();
+        }
+
+        function processDenms(raw) {
+            return raw
+                .filter(item => item.msg && item.msg.denm)
+                .map(item => {
+                    const denm = item.msg.denm;
+                    const mg = denm.management;
+                    const baseLat = mg.eventPosition.latitude / 1e7;
+                    const baseLon = mg.eventPosition.longitude / 1e7;
+                    let lat = baseLat, lon = baseLon;
+                    const coords = (denm.location.traces[0] || []).map(step => {
+                        lat += step.pathPosition.deltaLatitude / 1e7;
+                        lon += step.pathPosition.deltaLongitude / 1e7;
+                        return [lon, lat];
+                    });
+                    return {
+                        base: [baseLon, baseLat],
+                        coordinates: coords,
+                        stationID: mg.actionID.originatingStationID,
+                        cause: denm.situation.eventType.causeCode,
+                        subCause: denm.situation.eventType.subCauseCode,
+                        timestamp: item.timestamp
+                    };
+                });
+        }
+
+        let denmData, deckgl, slider, timeRange;
+
+        async function main() {
+            initTabs();
+            const allRaw = await loadDenms();
+            const start = new Date("2025-04-07T00:00:00+02:00").getTime();
+            const end = new Date("2025-04-08T00:00:00+02:00").getTime();
+            const raw = allRaw.filter(d => d.timestamp >= start && d.timestamp < end);
+
+            denmData = processDenms(raw);
+
+            const tsList = denmData.map(d => d.timestamp);
+            const tmin = Math.min(...tsList);
+            const tmax = Math.max(...tsList);
+            timeRange = [tmin, tmax];
+
+            slider = noUiSlider.create(document.getElementById('slider'), {
+                start: [tmin, tmax],
+                connect: true,
+                range: { min: tmin, max: tmax },
+                step: 1000,
+                tooltips: false,
+                pips: {
+                    mode: 'count',
+                    values: 3,
+                    format: {
+                        to: v => hhmmss(+v),
+                        from: v => +v
+                    }
+                }
+            });
+
+            document.getElementById('min-time').textContent = hhmmss(tmin);
+            document.getElementById('max-time').textContent = hhmmss(tmax);
+
+            slider.on('update', vals => {
+                timeRange = vals.map(v => +v);
+                document.getElementById('min-time').textContent = hhmmss(timeRange[0]);
+                document.getElementById('max-time').textContent = hhmmss(timeRange[1]);
+            });
+            slider.on('change', render);
+
+            deckgl = new deck.DeckGL({
+                container: 'map',
+                mapLib: maplibregl,
+                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                initialViewState: INITIAL_VIEW_STATE,
+                controller: true,
+                getCursor: ({ isHovering }) => isHovering ? 'pointer' : 'grab'
+            });
+
+            document.getElementById('showEvents').addEventListener('change', render);
+            document.getElementById('showTraces').addEventListener('change', render);
+            document.getElementById('tabTraj').addEventListener('click', () => {
+                window.location.href = 'trajectories.html';
+            });
+
+            render();
+        }
+
+        function render() {
+            const showEvents = document.getElementById('showEvents').checked;
+            const showTraces = document.getElementById('showTraces').checked;
+            const popup = document.getElementById('popup');
+            const data = denmData.filter(d =>
+                d.timestamp >= timeRange[0] && d.timestamp <= timeRange[1]
+            );
+
+            const layers = [];
+
+            if (showTraces) {
+                layers.push(new deck.PathLayer({
+                    id: 'denm-traces',
+                    data,
+                    getPath: d => d.coordinates,
+                    getColor: [255, 100, 100],
+                    getWidth: 4,
+                    widthMinPixels: 2
+                }));
+            }
+
+            if (showEvents) {
+                const ICON_URL = 'https://img.icons8.com/color/96/000000/error--v1.png';
+                const mapping = { event: { x: 0, y: 0, width: 96, height: 96, anchorY: 96 } };
+                layers.push(new deck.IconLayer({
+                    id: 'denm-events',
+                    data,
+                    pickable: true,
+                    iconAtlas: ICON_URL,
+                    iconMapping: mapping,
+                    getIcon: d => 'event',
+                    getPosition: d => d.base,
+                    sizeScale: 5,
+                    getSize: 8,
+                    onHover: ({ object, x, y }) => {
+                        if (!object) { popup.style.display = 'none'; return; }
+                        const dt = new Date(object.timestamp)
+                            .toISOString()
+                            .slice(0, 19).replace('T', ' ');
+                        popup.style.display = 'block';
+                        popup.style.left = `${x + 10}px`;
+                        popup.style.top = `${y + 10}px`;
+                        popup.innerHTML =
+                            `<strong>Station ID:</strong> ${object.stationID}<br/>` +
+                            `<strong>Cause:</strong> ${object.cause}<br/>` +
+                            `<strong>SubCause:</strong> ${object.subCause}<br/>` +
+                            `<strong>Time:</strong> ${dt}`;
+                    }
+                }));
+            }
+
+            deckgl.setProps({ layers });
+        }
+
+        function initTabs() {
+            
+            const tabRoad = document.getElementById('tabRoad');
+            const tabTraj = document.getElementById('tabTraj');
+            const tabDenm = document.getElementById('tabDenm');
+
+            tabRoad.addEventListener('click', () => {
+                tabRoad.classList.add('active');
+                tabTraj.classList.remove('active');
+                window.location.href = 'index.html';
+            });
+
+            tabTraj.addEventListener('click', () => {
+                tabTraj.classList.add('active');
+                tabDenm.classList.remove('active');
+                tabRoad.classList.remove('active');
+                window.location.href = 'trajectories.html';
+            });
+
+            tabDenm.addEventListener('click', () => {
+                tabDenm.classList.add('active');
+                tabRoad.classList.remove('active');
+                tabTraj.classList.remove('active');
+                window.location.href = 'denms.html';
+            });
+        }
+
+        main();
+    </script>
+</body>
+
+</html>

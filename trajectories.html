@@ -30,12 +30,14 @@
         #controls {
             position: absolute;
             top: 10px;
-            left: 20px;
+            left: 15px;
             z-index: 200;
             background: rgba(0, 0, 0, 0.7);
-            padding: 16px;
+            padding: 16px 36px;
+            padding-bottom: 40px;
             border-radius: 8px;
             width: 320px;
+            overflow: hidden;
         }
 
         #stationType {
@@ -117,6 +119,7 @@
         <div id="viewTabs">
             <button id="tabRoad">Road View</button>
             <button id="tabTraj" class="active">Trajectory View</button>
+            <button id="tabDenm">DENM View</button>
         </div>
         <label for="stationType">Station Type:</label>
         <select id="stationType">
@@ -128,7 +131,7 @@
         </select>
 
         <div id="time-range-labels">
-            <label>Time Range</label><br />
+            <label>Time Range(2025-04-07)</label><br />
             <span id="min-time">--:--:--</span> &mdash; <span id="max-time">--:--:--</span>
         </div>
         <div id="slider"></div>
@@ -215,7 +218,15 @@
                 pips: {
                     mode: 'count',
                     values: 3,
-                    format: { to: v => formatTime(v), from: v => Number(v) }
+                    format: {
+                        to: v => {
+                            const d = new Date(+v);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${hh}:${mm}`;
+                        },
+                        from: v => Number(v)
+                    }
                 }
             });
 
@@ -285,6 +296,7 @@
         function initTabs() {
             const tabRoad = document.getElementById('tabRoad');
             const tabTraj = document.getElementById('tabTraj');
+            const tabDenm = document.getElementById('tabDenm');
 
             tabRoad.addEventListener('click', () => {
                 tabRoad.classList.add('active');
@@ -294,7 +306,16 @@
 
             tabTraj.addEventListener('click', () => {
                 tabTraj.classList.add('active');
+                tabDenm.classList.remove('active');
                 tabRoad.classList.remove('active');
+                window.location.href = 'trajectories.html';
+            });
+
+            tabDenm.addEventListener('click', () => {
+                tabDenm.classList.add('active');
+                tabRoad.classList.remove('active');
+                tabTraj.classList.remove('active');
+                window.location.href = 'denms.html';
             });
         }
 

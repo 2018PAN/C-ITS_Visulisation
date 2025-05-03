@@ -33,12 +33,14 @@
         #controls {
             position: absolute;
             top: 10px;
-            left: 20px;
+            left: 15px;
             z-index: 200;
             background: rgba(0, 0, 0, 0.7);
-            padding: 16px;
+            padding: 16px 36px;
+            padding-bottom: 40px;
             border-radius: 8px;
             width: 320px;
+            overflow: hidden;
         }
 
         #stationType {
@@ -61,10 +63,12 @@
 
         #slider {
             margin: 12px 0;
+            box-sizing: border-box;
         }
 
         .noUi-connect {
             background: #26a69a;
+            box-sizing: border-box;
         }
 
         .noUi-horizontal .noUi-handle {
@@ -72,6 +76,7 @@
             width: 25px;
             border: 1px solid #888;
         }
+
 
         #popup {
             position: absolute;
@@ -120,6 +125,7 @@
         <div id="viewTabs">
             <button id="tabRoad" class="active">Road View</button>
             <button id="tabTraj">Trajectory View</button>
+            <button id="tabDenm">DENM View</button>
         </div>
         <label for="stationType">Station Type:</label>
         <select id="stationType">
@@ -131,7 +137,7 @@
         </select>
 
         <div id="time-range-labels">
-            <label>Time Range</label><br />
+            <label>Time Range(2025-04-07)</label><br />
             <span id="min-time">--:--:--</span> — <span id="max-time">--:--:--</span>
         </div>
         <div id="slider"></div>
@@ -175,14 +181,26 @@
 
             // init slider
             slider = noUiSlider.create(document.getElementById('slider'), {
-                start: [tmin, tmax], connect: true,
-                range: { min: tmin, max: tmax }, step: 1000,
+                start: [tmin, tmax],
+                connect: true,
+                range: { min: tmin, max: tmax },
+                step: 1000,
                 tooltips: false,
                 pips: {
-                    mode: 'count', values: 3,
-                    format: { to: v => formatTime(v), from: v => +v }
+                    mode: 'count',
+                    values: 3,
+                    format: {
+                        to: v => {
+                            const d = new Date(+v);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${hh}:${mm}`;
+                        },
+                        from: v => Number(v)
+                    }
                 }
             });
+
             document.getElementById('min-time').textContent = formatTime(tmin);
             document.getElementById('max-time').textContent = formatTime(tmax);
             slider.on('update', vals => {
@@ -271,17 +289,24 @@
         function initTabs() {
             const tabRoad = document.getElementById('tabRoad');
             const tabTraj = document.getElementById('tabTraj');
+            const tabDenm = document.getElementById('tabDenm');
             tabRoad.addEventListener('click', () => {
-                // 切换 highlight
                 tabRoad.classList.add('active');
+                tabDenm.classList.remove('active');
                 tabTraj.classList.remove('active');
-                // 跳转到 road 页面（如果当前就是 road，可去掉）
                 window.location.href = 'index.html';
             });
             tabTraj.addEventListener('click', () => {
                 tabTraj.classList.add('active');
+                tabDenm.classList.remove('active');
                 tabRoad.classList.remove('active');
                 window.location.href = 'trajectories.html';
+            });
+            tabDenm.addEventListener('click', () => {
+                tabDenm.classList.add('active');
+                tabRoad.classList.remove('active');
+                tabTraj.classList.remove('active');
+                window.location.href = 'denms.html';
             });
         }
 
