@@ -72,130 +72,128 @@
 
     /* --- 控件组通用样式调整 --- */
     .control-group {
-      margin-bottom: 12px;
+      margin-bottom: 12px; /* Slightly increased group spacing */
     }
 
-    .control-group>label,
-    #controls label.main-label
-
-      {
+    .control-group > label, /* Targeting direct children labels of control-group */
+    #controls label.main-label /* Keeping this for any specific main-label usage if intended */
+    {
       display: block;
-      margin-bottom: 10px;
+      margin-bottom: 10px; /* Spacing between label and control */
       font-size: 16px;
-      color: #e0e0e0;
-      font-weight: 500;
+      color: #e0e0e0; /* Brighter label text */
+      font-weight: 500; /* Slightly bolder */
     }
 
+    /* Styling for the div containing checkboxes to allow for better layout control */
     .control-group .checkbox-container {
-      display: flex;
-      flex-wrap: wrap;
+        display: flex;
+        flex-wrap: wrap; /* Allow checkboxes to wrap to next line if needed */
     }
 
+    /* Styling for individual checkbox labels */
     .control-group .checkbox-container label {
-      display: inline-flex;
-      align-items: center;
-      margin-right: 20px;
-      margin-bottom: 8px;
-      font-size: 14px;
-      color: #ccc;
-      font-weight: normal;
+        display: inline-flex; /* Align checkbox and text */
+        align-items: center;
+        margin-right: 20px; /* Space between checkboxes */
+        margin-bottom: 8px; /* Space if they wrap */
+        font-size: 14px;
+        color: #ccc; /* Lighter text for checkbox labels */
+        font-weight: normal; /* Normal weight for checkbox labels */
     }
 
     #controls select,
-    #controls input[type="checkbox"]+label {
+    #controls input[type="checkbox"] + label
+    {
       display: inline-block;
       vertical-align: middle;
     }
 
-    #controls select {
+    #controls select { /* General select style, will be overridden by specific ID if needed, but we target all selects in controls for consistency with index.html's approach */
       width: 100%;
-      padding: 10px 8px;
-      font-size: 17px;
-      border-radius: 4px;
-      border: 1px solid #555;
-      background: #111;
+      padding: 10px 8px; /* Increased padding, especially top/bottom for height */
+      font-size: 17px; /* Increased font size - trying 17px, can adjust */
+      border-radius: 4px; /* Matched to index.html #stationType */
+      border: 1px solid #555; /* Matched to index.html #stationType */
+      background: #111; /* Matched to index.html #stationType */
       color: #fff;
       box-sizing: border-box;
+      /* margin-top: 6px; */ /* Handled by .control-group in road+denms.html */
+      /* margin-bottom: 12px; */ /* Handled by .control-group in road+denms.html */
+      /* Remove transition and focus style if they differ from index.html's implicit style */
+      /* transition: border-color 0.2s, box-shadow 0.2s; */
     }
 
+    #controls select:focus {
+        /* Assuming index.html has no specific focus style for select, or a default one */
+        /* border-color: #007bff; */ /* Removing custom focus unless index.html has it */
+        /* box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); */ /* Removing custom focus shadow */
+         outline: none; /* Or some other default browser focus style */
+    }
+
+    /* 复选框的特定样式 */
     #controls label input[type="checkbox"] {
       margin-right: 8px;
-      width: 16px;
+      width: 16px; /* Slightly larger checkbox */
       height: 16px;
-      vertical-align: middle;
-      accent-color: #007bff;
+      vertical-align: middle; /* Ensure alignment */
+      accent-color: #007bff; /* Color for the check mark if browser supports */
     }
 
     #charts-container {
-      margin-top: 25px;
-      padding-top: 20px;
-      border-top: 1px solid #444c53;
+      margin-top: 25px; /* Consistent spacing */
+      padding-top: 20px; /* Consistent padding */
+      border-top: 1px solid #444c53; /* Softer separator, consistent with image */
     }
 
     #charts-container h4 {
       margin: 0 0 12px 0;
-      font-size: 16px;
-      color: #e0e0e0;
-      font-weight: 500;
+      font-size: 16px; /* Match control group labels */
+      color: #e0e0e0; /* Match control group labels */
+      font-weight: 500; /* Match control group labels */
     }
 
     #charts-container ul {
       list-style: none;
       padding: 0;
-      margin: 0 0 18px 0;
-      /* Increased bottom margin for lists */
-      font-size: 14px;
-      /* Slightly larger list item text */
+      margin: 0 0 18px 0; /* Increased bottom margin for lists */
+      font-size: 14px; /* Slightly larger list item text */
     }
 
     #charts-container li {
       margin-bottom: 8px;
       display: flex;
-      align-items: center;
-      /* Vertically align all parts of the list item */
+      align-items: center; /* Vertically align all parts of the list item */
       color: #ccc;
     }
 
-    .chart-item-details {
-      /* Container for legend dot/line and text label */
-      display: flex;
-      align-items: center;
-      min-width: 130px;
-      /* Adjust as needed for your longest label */
-      margin-right: 10px;
-      /* Space between label and bar area */
-      flex-shrink: 0;
-      /* Prevent this part from shrinking */
+    .chart-item-details { /* Container for legend dot/line and text label */
+        display: flex;
+        align-items: center;
+        min-width: 130px; /* Adjust as needed for your longest label */
+        margin-right: 10px; /* Space between label and bar area */
+        flex-shrink: 0; /* Prevent this part from shrinking */
     }
 
-    .chart-bar-wrapper {
-      /* Container for the bar itself and the count number */
-      flex-grow: 1;
-      /* Allow this to take up remaining space */
-      display: flex;
-      align-items: center;
-      min-width: 100px;
-      /* Minimum width for the bar area */
+    .chart-bar-wrapper { /* Container for the bar itself and the count number */
+        flex-grow: 1; /* Allow this to take up remaining space */
+        display: flex;
+        align-items: center;
+        min-width: 100px; /* Minimum width for the bar area */
     }
 
     .chart-bar {
-      height: 12px;
-      /* Thickness of the bar */
-      border-radius: 3px;
-      /* Rounded corners for the bar */
-      margin-right: 8px;
-      /* Space between the bar and the count number */
-      transition: width 0.3s ease-out;
-      /* Smooth animation for width changes */
+      height: 12px; /* Thickness of the bar */
+      border-radius: 3px; /* Rounded corners for the bar */
+      margin-right: 8px; /* Space between the bar and the count number */
+      transition: width 0.3s ease-out; /* Smooth animation for width changes */
       /* background-color and width will be set via inline styles in JS */
     }
 
     .chart-item-count {
-      min-width: 25px;
-      /* Minimum space for the count number */
-      text-align: right;
-      /* Align count to the right */
-      font-size: 13px;
+        min-width: 25px; /* Minimum space for the count number */
+        text-align: right; /* Align count to the right */
+        font-size: 13px;
     }
 
     #charts-container .chart-legend-dot {
@@ -204,8 +202,7 @@
       border-radius: 50%;
       margin-right: 8px;
       display: inline-block;
-      vertical-align: middle;
-      /* Ensured */
+      vertical-align: middle; /* Ensured */
     }
 
     #charts-container .chart-legend-line {
@@ -214,8 +211,7 @@
       margin-right: 8px;
       border-radius: 1.5px;
       display: inline-block;
-      vertical-align: middle;
-      /* Ensured */
+      vertical-align: middle; /* Ensured */
     }
 
     #time-range-labels {
@@ -226,8 +222,7 @@
     }
 
     #slider {
-      margin: 12px 0 60px 0;
-      /* Increased bottom margin */
+      margin: 12px 0 60px 0; /* Increased bottom margin */
     }
 
     .noUi-connect {
@@ -240,7 +235,7 @@
       border: 1px solid #888;
     }
 
-
+    /* 图例 */
     #legend {
       position: absolute;
       bottom: 20px;
@@ -292,7 +287,7 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-
+    /* 弹窗 */
     #popup {
       position: absolute;
       z-index: 300;
@@ -338,8 +333,9 @@
       <button id="tabDenm" class="active">DENM View</button>
     </div>
 
+    <!-- Station Type 过滤 -->
     <div class="control-group">
-      <label for="denmType">Events Station Type:</label>
+      <label for="denmType">Station Type:</label>
       <select id="denmType">
         <option value="all">All</option>
         <option value="5">Passenger Car</option>
@@ -351,13 +347,13 @@
     </div>
 
     <div class="control-group">
-      <label>Display Options:</label>
-      <div class="checkbox-container">
-        <label><input type="checkbox" id="showRoads" checked> Show Roads</label>
-        <label><input type="checkbox" id="showHeatmap"> Show Heatmap</label>
-        <label><input type="checkbox" id="showEvents" checked> Show Events</label>
-        <label><input type="checkbox" id="showTraces"> Show Traces</label>
-      </div>
+        <label>Display Options:</label>
+        <div class="checkbox-container"> 
+            <label><input type="checkbox" id="showRoads" checked> Show Roads</label>
+            <label><input type="checkbox" id="showHeatmap"> Show Heatmap</label>
+            <label><input type="checkbox" id="showEvents" checked> Show Events</label>
+            <label><input type="checkbox" id="showTraces"> Show Traces</label>
+        </div>
     </div>
 
     <div id="time-range-labels">
@@ -368,13 +364,15 @@
 
     <div id="charts-container">
       <div id="event-counts-chart">
-        <h4>Events Distribution</h4>
+        <h4>Events on Map</h4>
         <ul id="event-counts-list">
+          <!-- Counts will be populated by JS -->
         </ul>
       </div>
       <div id="speed-distribution-chart">
         <h4>Road Speed Distribution</h4>
         <ul id="speed-distribution-list">
+          <!-- Counts will be populated by JS -->
         </ul>
       </div>
     </div>
@@ -617,7 +615,7 @@
           }
         });
         if (totalSegments === 0) {
-          speedDistList.innerHTML = '<li>No road data in selected range or for active roads.</li>';
+            speedDistList.innerHTML = '<li>No road data in selected range or for active roads.</li>';
         }
       }
 
