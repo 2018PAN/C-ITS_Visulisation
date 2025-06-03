@@ -1,95 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DENM Events Visualization</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DENM & Road Visualization</title>
 
   <!-- deck.gl & MapLibre GL -->
   <script src="https://unpkg.com/deck.gl@8.9.30/dist.min.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" rel="stylesheet"/>
+  <link href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
 
   <!-- noUiSlider -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
 
   <style>
-    body { margin:0; background:#000; color:#fff; font-family:sans-serif; }
-    #map { position:absolute; top:0; bottom:0; width:100%; }
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
 
-    /* 左上控件 */
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* 控件 */
     #controls {
-      position:absolute; top:10px; left:15px; z-index:200;
-      background:rgba(0,0,0,0.7); padding:16px 36px;
-      padding-bottom:40px; border-radius:8px; width:320px;
-      overflow:hidden;
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 16px 36px;
+      padding-bottom: 40px;
+      border-radius: 8px;
+      width: 320px;
+      overflow: hidden;
     }
-    #viewTabs { display:flex; margin-bottom:12px; }
+
+    #viewTabs {
+      display: flex;
+      margin-bottom: 12px;
+    }
+
     #viewTabs button {
-      flex:1; padding:8px; background:#222; color:#ccc; border:none;
-      cursor:pointer; font-size:16px; border-radius:8px;
+      flex: 1;
+      padding: 8px;
+      background: #222;
+      color: #ccc;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 8px;
     }
+
     #viewTabs button.active {
-      background:#26a69a; color:#000; font-weight:bold;
+      background: #26a69a;
+      color: #000;
+      font-weight: bold;
     }
-    #viewTabs button+button { margin-left:4px; }
-    #controls label {
-      display:inline-block; margin-right:12px; cursor:pointer;
+
+    #viewTabs button+button {
+      margin-left: 4px;
     }
+
+    /* --- 控件组通用样式调整 --- */
+    .control-group {
+      margin-bottom: 12px;
+    }
+
+    .control-group>label,
+    #controls label.main-label
+
+      {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    .control-group .checkbox-container {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .control-group .checkbox-container label {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 20px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #ccc;
+      font-weight: normal;
+    }
+
+    #controls select,
+    #controls input[type="checkbox"]+label {
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    #controls select {
+      width: 100%;
+      padding: 10px 8px;
+      font-size: 17px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: #111;
+      color: #fff;
+      box-sizing: border-box;
+    }
+
+    #controls label input[type="checkbox"] {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
+      vertical-align: middle;
+      accent-color: #007bff;
+    }
+
+    #charts-container {
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid #444c53;
+    }
+
+    #charts-container h4 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      color: #e0e0e0;
+      font-weight: 500;
+    }
+
+    #charts-container ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 18px 0;
+      /* Increased bottom margin for lists */
+      font-size: 14px;
+      /* Slightly larger list item text */
+    }
+
+    #charts-container li {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      /* Vertically align all parts of the list item */
+      color: #ccc;
+    }
+
+    .chart-item-details {
+      /* Container for legend dot/line and text label */
+      display: flex;
+      align-items: center;
+      min-width: 130px;
+      /* Adjust as needed for your longest label */
+      margin-right: 10px;
+      /* Space between label and bar area */
+      flex-shrink: 0;
+      /* Prevent this part from shrinking */
+    }
+
+    .chart-bar-wrapper {
+      /* Container for the bar itself and the count number */
+      flex-grow: 1;
+      /* Allow this to take up remaining space */
+      display: flex;
+      align-items: center;
+      min-width: 100px;
+      /* Minimum width for the bar area */
+    }
+
+    .chart-bar {
+      height: 12px;
+      /* Thickness of the bar */
+      border-radius: 3px;
+      /* Rounded corners for the bar */
+      margin-right: 8px;
+      /* Space between the bar and the count number */
+      transition: width 0.3s ease-out;
+      /* Smooth animation for width changes */
+      /* background-color and width will be set via inline styles in JS */
+    }
+
+    .chart-item-count {
+      min-width: 25px;
+      /* Minimum space for the count number */
+      text-align: right;
+      /* Align count to the right */
+      font-size: 13px;
+    }
+
+    #charts-container .chart-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      display: inline-block;
+      vertical-align: middle;
+      /* Ensured */
+    }
+
+    #charts-container .chart-legend-line {
+      width: 18px;
+      height: 3px;
+      margin-right: 8px;
+      border-radius: 1.5px;
+      display: inline-block;
+      vertical-align: middle;
+      /* Ensured */
+    }
+
     #time-range-labels {
-      text-align:center; margin-top:20px; margin-bottom:12px;
-      font-size:17px;
+      text-align: center;
+      margin-top: 20px;
+      margin-bottom: 12px;
+      font-size: 17px;
     }
-    #slider { margin:12px 0; }
-    .noUi-connect { background:#26a69a; }
+
+    #slider {
+      margin: 12px 0 60px 0;
+      /* Increased bottom margin */
+    }
+
+    .noUi-connect {
+      background: #26a69a;
+    }
+
     .noUi-horizontal .noUi-handle {
-      background:#fff; width:25px; border:1px solid #888;
+      background: #fff;
+      width: 25px;
+      border: 1px solid #888;
     }
 
-    /* 图例 */
+
     #legend {
-      position:absolute; bottom:20px; right:20px;
-      background:rgba(0,0,0,0.8); color:#fff;
-      padding:16px 20px; border-radius:10px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.6);
-      pointer-events:none;
-    }
-    #legend h4 {
-      margin:0 0 12px; font-size:18px; font-weight:600;
-      letter-spacing:0.5px;
-    }
-    #legend ul { list-style:none; margin:0; padding:0; }
-    #legend li {
-      display:flex; align-items:center; margin-bottom:10px;
-      font-size:15px; line-height:1.4;
-    }
-    .legend-dot {
-      width:14px; height:14px; border-radius:50%;
-      margin-right:10px; border:1px solid rgba(255,255,255,0.3);
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 16px 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      font-family: "Segoe UI", Tahoma, sans-serif;
     }
 
-    /* 弹窗 */
+    #legend h4 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    #legend ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    #legend li {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      margin-right: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .legend-line {
+      display: inline-block;
+      width: 24px;
+      height: 4px;
+      margin-right: 8px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+
     #popup {
-      position:absolute; z-index:300;
-      pointer-events:none; display:none;
-      white-space:normal; max-width:240px;
+      position: absolute;
+      z-index: 300;
+      pointer-events: none;
+      display: none;
+      white-space: normal;
+      max-width: 240px;
+      font-family: sans-serif;
     }
+
     .popup-card {
-      background:rgba(30,30,30,0.95); border-radius:6px;
-      overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.7);
+      background: rgba(30, 30, 30, 0.95);
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+      color: #fff;
     }
+
     .popup-header {
-      padding:8px 12px; font-size:16px; font-weight:600;
-      color:#000;
+      padding: 8px 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #000;
     }
+
     .popup-body {
-      padding:10px 12px; background:#202020;
-      font-size:13px; color:#fff;
+      padding: 10px 12px;
+      background: #202020;
+      font-size: 13px;
     }
-    .popup-body .item { margin-bottom:8px; }
+
+    .popup-body .item {
+      margin-bottom: 8px;
+    }
   </style>
 </head>
+
 <body>
   <div id="controls">
     <div id="viewTabs">
@@ -97,32 +337,64 @@
       <button id="tabTraj">Trajectory View</button>
       <button id="tabDenm" class="active">DENM View</button>
     </div>
-    <label><input type="checkbox" id="showEvents" checked> Show Events</label>
-    <label><input type="checkbox" id="showTraces" checked> Show Traces</label>
+
+    <div class="control-group">
+      <label for="denmType">Vehicles Type:</label>
+      <select id="denmType">
+        <option value="all">All</option>
+        <option value="5">Passenger Car</option>
+        <option value="6">Bus</option>
+        <option value="7">Light Truck</option>
+        <option value="10">Special Vehicle</option>
+        <option value="15">Roadside Unit</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Traffic Conditions:</label>
+      <div class="checkbox-container">
+        <label><input type="checkbox" id="showRoads" checked> Traffic Flows</label>
+        <label><input type="checkbox" id="showHeatmap"> Heatmap</label>
+        <label><input type="checkbox" id="showEvents" checked> Traffic Incidents</label>
+        <label><input type="checkbox" id="showTraces"> Incident Traces</label>
+      </div>
+    </div>
+
     <div id="time-range-labels">
-      <label>Time Range (2025-04-07)</label><br/>
+      <label>Time Range (2025-04-07)</label><br />
       <span id="min-time">--:--:--</span> &mdash; <span id="max-time">--:--:--</span>
     </div>
     <div id="slider"></div>
+
+    <div id="charts-container">
+      <div id="event-counts-chart">
+        <h4>Total Traffic Incidents</h4>
+        <ul id="event-counts-list">
+        </ul>
+      </div>
+      <div id="speed-distribution-chart">
+        <h4>Link Speed</h4>
+        <ul id="speed-distribution-list">
+        </ul>
+      </div>
+    </div>
   </div>
 
   <div id="map"></div>
 
   <div id="legend">
-    <h4>Event Cause</h4>
+    <h4>Incident Cause</h4>
     <ul>
-      <li>
-        <span class="legend-dot" style="background:#ff0000"></span>
-        Accident (1)
-      </li>
-      <li>
-        <span class="legend-dot" style="background:#ffff00"></span>
-        Obstacle (3)
-      </li>
-      <li>
-        <span class="legend-dot" style="background:#00ff00"></span>
-        Other (95)
-      </li>
+      <li><span class="legend-dot" style="background:rgb(255,105,180)"></span>Accident (1)</li>
+      <li><span class="legend-dot" style="background:rgb(65,105,225)"></span>Obstacle (3)</li>
+      <li><span class="legend-dot" style="background:rgb(72,209,204)"></span>Other (95)</li>
+    </ul>
+    <h4 style="margin-top:16px;">Link Speed</h4>
+    <ul>
+      <li><span class="legend-line" style="background:rgb(200,80,80)"></span>&lt; 10 km/h</li>
+      <li><span class="legend-line" style="background:rgb(200,120,60)"></span>10 – 25 km/h</li>
+      <li><span class="legend-line" style="background:rgb(180,180,100)"></span>25 – 45 km/h</li>
+      <li><span class="legend-line" style="background:rgb(80,200,80)"></span>≥ 45 km/h</li>
     </ul>
   </div>
 
@@ -130,159 +402,431 @@
 
   <script>
     const INITIAL_VIEW_STATE = {
-      latitude:47.7, longitude:13.05, zoom:10, pitch:0, bearing:0
+      latitude: 47.7, longitude: 13.05, zoom: 10, pitch: 0, bearing: 0
     };
-    function hhmmss(ms){
-      const d=new Date(ms);
-      return [d.getHours(),d.getMinutes(),d.getSeconds()]
-        .map(n=>String(n).padStart(2,'0')).join(':');
+    function hhmmss(ms) {
+      const d = new Date(ms);
+      return [d.getHours(), d.getMinutes(), d.getSeconds()]
+        .map(n => String(n).padStart(2, '0')).join(':');
     }
 
-    // 文本映射
-    const CAUSE_TEXT = {
-      1:'Accident',
-      3:'Obstacle',
-      95:'Other'
-    };
+    const CAUSE_TEXT = { 1: 'Accident', 3: 'Obstacle', 95: 'Other' };
     const SUBCAUSE_TEXT = {
-      '1-0':'Minor collision',
-      '3-1':'Road obstruction',
-      '95-1':'Roadworks',
-      '95-2':'Weather'
+      '1-0': 'Minor collision',
+      '3-1': 'Road obstruction',
+      '95-1': 'Roadworks',
+      '95-2': 'Weather'
+    };
+    const STATION_TYPE_NAMES = {
+      5: 'Passenger Car', 6: 'Bus', 7: 'Light Truck',
+      10: 'Special Vehicle', 15: 'Roadside Unit'
     };
     const CAUSE_COLOR = {
-      1:[255,0,0], 3:[255,255,0], default:[0,255,0]
+      1: [255, 105, 180], 3: [65, 105, 225], default: [72, 209, 204]
     };
 
-    async function loadDenms(){
-      const paths=[
-        'Data/denms_04_07-8/denms_04_07-8_1.json',
-        'Data/denms_04_07-8/denms_04_07-8_2.json',
-        'Data/denms_04_07-8/denms_04_07-8_3.json'
-      ];
-      const arrs=await Promise.all(paths.map(p=>fetch(p).then(r=>r.json())));
-      return arrs.flat();
+    const MIN_ZOOM_LEVEL = 7.2; // Adjusted from 9 back to 7.2 to see the entire clamped area
+    const MIN_LATITUDE_BOUNDARY = 47.3;
+    const MAX_LATITUDE_BOUNDARY = 48.0;
+    const MIN_LONGITUDE_BOUNDARY = 12.8;
+    const MAX_LONGITUDE_BOUNDARY = 13.4;
+
+    let appViewState = { ...INITIAL_VIEW_STATE }; // External variable to hold the current view state
+
+    let roadsGeo, segments, denmData, camDataProcessed, deckgl, slider, timeRange;
+
+    async function loadData() {
+      const [
+        roadsGeoJson,
+        segmentsJson,
+        denmFile1, denmFile2, denmFile3,
+        camFile1, camFile2, camFile3
+      ] = await Promise.all([
+        fetch('Data/roads.geojson').then(r => r.json()),
+        fetch('Data/segments.json').then(r => r.json()),
+        fetch('Data/denms_04_07-8/denms_04_07-8_1.json').then(r => r.json()),
+        fetch('Data/denms_04_07-8/denms_04_07-8_2.json').then(r => r.json()),
+        fetch('Data/denms_04_07-8/denms_04_07-8_3.json').then(r => r.json()),
+        fetch('Data/cams_04_07_7-8/cams_04_07_7-8_1_filtered.json').then(r => r.json()),
+        fetch('Data/cams_04_07_7-8/cams_04_07_7-8_2_filtered.json').then(r => r.json()),
+        fetch('Data/cams_04_07_7-8/cams_04_07_7-8_3_filtered.json').then(r => r.json())
+      ]);
+      roadsGeo = roadsGeoJson;
+      segments = segmentsJson;
+      const denmRaw = [denmFile1, denmFile2, denmFile3].flat();
+      const camRaw = [camFile1, camFile2, camFile3].flat();
+      return { denmRaw, camRaw };
     }
-    function processDenms(raw){
-      const DAY0=new Date("2025-04-07T00:00:00+02:00").getTime();
-      const DAY1=new Date("2025-04-08T00:00:00+02:00").getTime();
-      return raw.filter(item=>
-        item.msg&&item.msg.denm&&item.timestamp>=DAY0&&item.timestamp<DAY1
-      ).map(item=>{
-        const denm=item.msg.denm, mg=denm.management;
-        const lat0=mg.eventPosition.latitude/1e7;
-        const lon0=mg.eventPosition.longitude/1e7;
-        let lat=lat0, lon=lon0;
-        const coords=(denm.location.traces[0]||[]).map(step=>{
-          lat+=step.pathPosition.deltaLatitude/1e7;
-          lon+=step.pathPosition.deltaLongitude/1e7;
-          return [lon,lat];
+
+    function processDenms(raw) {
+      const DAY0 = new Date("2025-04-07T00:00:00+02:00").getTime();
+      const DAY1 = new Date("2025-04-08T00:00:00+02:00").getTime();
+      return raw.filter(it =>
+        it.msg && it.msg.denm && it.timestamp >= DAY0 && it.timestamp < DAY1
+      ).map(it => {
+        const d = it.msg.denm, m = d.management;
+        const lat0 = m.eventPosition.latitude / 1e7,
+          lon0 = m.eventPosition.longitude / 1e7;
+        let lat = lat0, lon = lon0;
+        const coords = (d.location.traces[0] || []).map(s => {
+          lat += s.pathPosition.deltaLatitude / 1e7;
+          lon += s.pathPosition.deltaLongitude / 1e7;
+          return [lon, lat];
         });
         return {
-          base:[lon0,lat0],
-          coordinates:coords,
-          stationID:mg.actionID.originatingStationID,
-          cause:denm.situation.eventType.causeCode,
-          subCause:denm.situation.eventType.subCauseCode,
-          timestamp:item.timestamp
+          base: [lon0, lat0],
+          coordinates: coords,
+          stationID: m.actionID.originatingStationID,
+          stationType: m.stationType,
+          cause: d.situation.eventType.causeCode,
+          subCause: d.situation.eventType.subCauseCode,
+          timestamp: it.timestamp
         };
       });
     }
 
-    let denmData, deckgl, slider, timeRange;
-    async function main(){
+    function processCams(rawCamData) {
+      const DAY0_CAM = new Date("2025-04-07T00:00:00+02:00").getTime();
+      const DAY1_CAM = new Date("2025-04-08T00:00:00+02:00").getTime();
+
+      return rawCamData.filter(cam =>
+        cam.timestamp >= DAY0_CAM && cam.timestamp < DAY1_CAM
+      ).map(cam => {
+        return {
+          position: [cam.longitude, cam.latitude],
+          speed: cam.speed_m_s,
+          timestamp: cam.timestamp,
+          stationType: cam.stationType
+        };
+      });
+    }
+
+    async function main() {
       initTabs();
-      const raw=await loadDenms();
-      denmData=processDenms(raw);
+      const { denmRaw, camRaw } = await loadData();
+      denmData = processDenms(denmRaw);
+      camDataProcessed = processCams(camRaw);
 
-      // 计算时间范围
-      const ts=denmData.map(d=>d.timestamp);
-      const tmin=Math.min(...ts), tmax=Math.max(...ts);
-      timeRange=[tmin,tmax];
+      // --- 固定起止时间 ---
+      const FIXED_START = new Date("2025-04-07T07:00:00+02:00").getTime();
+      const FIXED_END = new Date("2025-04-07T08:00:00+02:00").getTime();
+      timeRange = [FIXED_START, FIXED_END];
 
-      // slider
-      slider=noUiSlider.create(document.getElementById('slider'),{
-        start:[tmin,tmax], connect:true,
-        range:{min:tmin,max:tmax}, step:1000,
-        tooltips:false,
-        pips:{
-          mode:'count', values:3,
-          format:{ to:v=>hhmmss(+v), from:v=>+v }
+      // 创建 slider 时使用固定范围
+      slider = noUiSlider.create(document.getElementById('slider'), {
+        start: [FIXED_START, FIXED_END],
+        connect: true,
+        range: { min: FIXED_START, max: FIXED_END },
+        step: 1000,
+        tooltips: false,
+        pips: {
+          mode: 'count',
+          values: 3,
+          format: { to: v => hhmmss(+v), from: v => +v }
         }
       });
-      document.getElementById('min-time').textContent=hhmmss(tmin);
-      document.getElementById('max-time').textContent=hhmmss(tmax);
-      slider.on('update',vals=>{
-        timeRange=vals.map(v=>+v);
-        document.getElementById('min-time').textContent=hhmmss(timeRange[0]);
-        document.getElementById('max-time').textContent=hhmmss(timeRange[1]);
+      // 初始化标签
+      document.getElementById('min-time').textContent = hhmmss(FIXED_START);
+      document.getElementById('max-time').textContent = hhmmss(FIXED_END);
+      // 滑块更新时，同样限制在这一区间
+      slider.on('update', vals => {
+        timeRange = vals.map(v => +v);
+        document.getElementById('min-time').textContent = hhmmss(timeRange[0]);
+        document.getElementById('max-time').textContent = hhmmss(timeRange[1]);
       });
       slider.on('change', render);
 
-      // DeckGL
-      deckgl=new deck.DeckGL({
-        container:'map',
-        mapLib:maplibregl,
-        mapStyle:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        initialViewState:INITIAL_VIEW_STATE,
-        controller:true,
-        getCursor:({isHovering})=>isHovering?'pointer':'grab'
+      deckgl = new deck.DeckGL({
+        container: 'map',
+        mapLib: maplibregl,
+        mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        initialViewState: appViewState, // Use the external appViewState
+        controller: true, 
+        getCursor: ({ isHovering }) => isHovering ? 'pointer' : 'grab',
+        onViewStateChange: ({ viewState: proposedViewState, oldViewState }) => {
+          let targetLat = proposedViewState.latitude;
+          let targetLon = proposedViewState.longitude;
+          let targetZoom = proposedViewState.zoom;
+          let targetBearing = proposedViewState.bearing;
+          let targetPitch = proposedViewState.pitch;
+
+          // 1. Handle zoom clamping first
+          if (proposedViewState.zoom < MIN_ZOOM_LEVEL) {
+            targetZoom = MIN_ZOOM_LEVEL;
+            // When zoom is clamped, revert position and orientation to oldViewState
+            // to prevent panning/rotation at the zoom boundary.
+            targetLat = oldViewState.latitude;
+            targetLon = oldViewState.longitude;
+            targetBearing = oldViewState.bearing;
+            targetPitch = oldViewState.pitch;
+          }
+
+          // 2. Apply geographical boundary clamping to the (potentially reverted) coordinates
+          if (targetLat < MIN_LATITUDE_BOUNDARY) targetLat = MIN_LATITUDE_BOUNDARY;
+          if (targetLat > MAX_LATITUDE_BOUNDARY) targetLat = MAX_LATITUDE_BOUNDARY;
+          if (targetLon < MIN_LONGITUDE_BOUNDARY) targetLon = MIN_LONGITUDE_BOUNDARY;
+          if (targetLon > MAX_LONGITUDE_BOUNDARY) targetLon = MAX_LONGITUDE_BOUNDARY;
+          
+          // Update the global appViewState with the fully clamped state
+          appViewState = {
+            latitude: targetLat,
+            longitude: targetLon,
+            zoom: targetZoom,
+            bearing: targetBearing, 
+            pitch: targetPitch     
+          };
+          
+          // Tell Deck.gl to use this updated appViewState
+          deckgl.setProps({ viewState: appViewState });
+        }
       });
 
-      document.getElementById('showEvents').addEventListener('change', render);
-      document.getElementById('showTraces').addEventListener('change', render);
+      ['showRoads', 'showHeatmap', 'showEvents', 'showTraces', 'denmType']
+        .forEach(id => document.getElementById(id).addEventListener('change', render));
 
       render();
     }
 
-    function render(){
-      const showEvents=document.getElementById('showEvents').checked;
-      const showTraces=document.getElementById('showTraces').checked;
-      const popupEl=document.getElementById('popup');
-      const data=denmData.filter(d=>d.timestamp>=timeRange[0]&&d.timestamp<=timeRange[1]);
-      const layers=[];
 
-      if(showTraces){
-        layers.push(new deck.PathLayer({
-          id:'denm-traces', data,
-          getPath:d=>d.coordinates,
-          getColor:[255,100,100],
-          getWidth:4, widthMinPixels:2
+    function render() {
+      const showRoads = document.getElementById('showRoads').checked;
+      const showHeatmap = document.getElementById('showHeatmap').checked;
+      const showEvents = document.getElementById('showEvents').checked;
+      const showTraces = document.getElementById('showTraces').checked;
+      const selType = document.getElementById('denmType').value;
+      const popupEl = document.getElementById('popup');
+
+      // 根据时间和 stationType 过滤数据
+      let evs = denmData.filter(d =>
+        d.timestamp >= timeRange[0] && d.timestamp <= timeRange[1]
+      );
+      if (selType !== 'all') {
+        evs = evs.filter(d => String(d.stationType) === selType);
+      }
+
+      // ——————————————————————————————————————————————————————————————————
+      // 更新事件数量图表
+      const eventCountsList = document.getElementById('event-counts-list');
+      eventCountsList.innerHTML = ''; // 清空旧数据
+
+      // 统计具有唯一 (位置坐标 + 事件原因代码) 组合的事件数量
+      const uniqueLocationCauseCombinations = new Set();
+      const currentCauseCounts = {}; // 使用对象初始化
+
+      evs.forEach(event => {
+        // 使用 d.base (即 eventPosition) 作为位置的键
+        const locationKey = `${event.base[0]},${event.base[1]}`;
+        const combinationKey = `${locationKey}_${event.cause}`;
+
+        if (!uniqueLocationCauseCombinations.has(combinationKey)) {
+          uniqueLocationCauseCombinations.add(combinationKey);
+          currentCauseCounts[event.cause] = (currentCauseCounts[event.cause] || 0) + 1;
+        }
+      });
+
+      const maxCauseCount = Math.max(0, ...Object.values(currentCauseCounts));
+
+      Object.entries(currentCauseCounts).forEach(([cause, count]) => {
+        const causeText = CAUSE_TEXT[cause] || 'Unknown';
+        const color = CAUSE_COLOR[cause] || CAUSE_COLOR.default;
+        const barWidth = maxCauseCount > 0 ? (count / maxCauseCount) * 100 : 0;
+        const listItem = document.createElement('li');
+        listItem.innerHTML = `
+          <div class="chart-item-details">
+            <span class="chart-legend-dot" style="background:rgb(${color.join(',')})"></span>
+            ${causeText}
+          </div>
+          <div class="chart-bar-wrapper">
+            <div class="chart-bar" style="width:${barWidth}%; background:rgb(${color.join(',')})"></div>
+            <span class="chart-item-count">${count}</span>
+          </div>`;
+        eventCountsList.appendChild(listItem);
+      });
+      if (Object.keys(currentCauseCounts).length === 0) {
+        eventCountsList.innerHTML = '<li>No events in selected range.</li>';
+      }
+
+      const layers = [];
+
+      // 更新道路速度图表函数
+      function updateSpeedDistributionChart(speedMap, countMap) {
+        const speedDistList = document.getElementById('speed-distribution-list');
+        speedDistList.innerHTML = ''; // 清空旧数据
+        const currentSpeedCategories = {
+          '< 10 km/h': { count: 0, color: [200, 80, 80] },
+          '10 – 25 km/h': { count: 0, color: [200, 120, 60] },
+          '25 – 45 km/h': { count: 0, color: [180, 180, 100] },
+          '≥ 45 km/h': { count: 0, color: [80, 200, 80] }
+        };
+
+        Object.values(speedMap).forEach(speed_ms => { // speed_ms is in m/s
+          const speed_kmh = speed_ms * 3.6;
+          if (speed_kmh < 10) currentSpeedCategories['< 10 km/h'].count++;
+          else if (speed_kmh < 25) currentSpeedCategories['10 – 25 km/h'].count++;
+          else if (speed_kmh < 45) currentSpeedCategories['25 – 45 km/h'].count++;
+          else currentSpeedCategories['≥ 45 km/h'].count++;
+        });
+
+        const maxSpeedCount = Math.max(0, ...Object.values(currentSpeedCategories).map(c => c.count));
+        let totalSegments = 0;
+
+        Object.entries(currentSpeedCategories).forEach(([range, data]) => {
+          if (data.count > 0) {
+            totalSegments += data.count;
+            const barWidth = maxSpeedCount > 0 ? (data.count / maxSpeedCount) * 100 : 0;
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `
+              <div class="chart-item-details">
+                <span class="chart-legend-line" style="background:rgb(${data.color.join(',')})"></span>
+                ${range}
+              </div>
+              <div class="chart-bar-wrapper">
+                <div class="chart-bar" style="width:${barWidth}%; background:rgb(${data.color.join(',')})"></div>
+                <span class="chart-item-count">${data.count}</span>
+              </div>`;
+            speedDistList.appendChild(listItem);
+          }
+        });
+        if (totalSegments === 0) {
+          speedDistList.innerHTML = '<li>No road data in selected range or for active roads.</li>';
+        }
+      }
+
+      // 1) Roads Layer
+      if (showRoads) {
+        const speedMap = {}, countMap = {};
+        segments.forEach(s => {
+          if (!s.timestamps.some(t => t >= timeRange[0] && t <= timeRange[1])) return;
+          const k = s.way_id;
+          speedMap[k] = (speedMap[k] || 0) + s.speed;
+          countMap[k] = (countMap[k] || 0) + 1;
+        });
+        Object.keys(speedMap).forEach(k => speedMap[k] /= countMap[k]);
+        const roadsFC = {
+          type: 'FeatureCollection',
+          features: roadsGeo.features.filter(f => {
+            const id = f.properties['@id'] || f.properties.id;
+            return speedMap[id] !== undefined;
+          })
+        };
+        // 在 roadsFC 定义之后更新图表
+        updateSpeedDistributionChart(speedMap, countMap);
+
+        layers.push(new deck.GeoJsonLayer({
+          id: 'roads', data: roadsFC, pickable: true,
+          getLineWidth: 2, lineWidthMinPixels: 2,
+          lineJointRounded: true, lineCapRounded: true,
+          getLineColor: f => {
+            const id = f.properties['@id'] || f.properties.id;
+            const c = speedMap[id];
+            if (c < 2) return [200, 80, 80];
+            if (c < 6) return [200, 120, 60];
+            if (c < 12) return [180, 180, 100];
+            return [80, 200, 80];
+          },
+          onHover: ({ object, x, y }) => {
+            if (!object) { popupEl.style.display = 'none'; return; }
+            const p = object.properties;
+            const id = p['@id'] || p.id;
+            const name = p.name || id;
+            const avg_ms = speedMap[id]; // Original speed in m/s
+            const avg_kmh = (avg_ms * 3.6).toFixed(2); // Converted to km/h
+            const cnt = countMap[id];
+            popupEl.innerHTML = `
+              <div class="popup-card">
+                <div class="popup-header" style="background:rgba(90,90,90,0.9);">
+                  ${name}
+                </div>
+                <div class="popup-body">
+                  <div class="item"><strong>Segments:</strong> ${cnt}</div>
+                  <div class="item"><strong>Avg Speed:</strong> ${avg_kmh} km/h</div>
+                </div>
+              </div>`;
+            popupEl.style.left = `${x + 10}px`;
+            popupEl.style.top = `${y + 10}px`;
+            popupEl.style.display = 'block';
+          }
+        }));
+      } else {
+        // 如果道路图层不显示，清空速度分布图表
+        document.getElementById('speed-distribution-list').innerHTML = '<li>Show Roads to see speed distribution.</li>';
+      }
+
+      // ——————————————————————————————————————————————————————————————————
+      // 2) Heatmap Layer
+      if (showHeatmap) {
+        // Filter CAM data for heatmap
+        let heatmapData = camDataProcessed.filter(d =>
+          d.timestamp >= timeRange[0] && d.timestamp <= timeRange[1]
+        );
+        if (selType !== 'all') {
+          heatmapData = heatmapData.filter(d => String(d.stationType) === selType);
+        }
+
+        const MAX_SPEED_MS = 8;
+        layers.push(new deck.HeatmapLayer({
+          id: 'cam-speed-heatmap',
+          data: heatmapData,
+          getPosition: d => d.position,
+          getWeight: d => Math.max(0, MAX_SPEED_MS - d.speed),
+          aggregation: 'SUM',
+          intensity: 0.8,
+          radiusPixels: 60,
+          threshold: 0.2,
+          colorRange: [
+            [59, 130, 246, 50],
+            [94, 234, 213, 120],
+            [253, 224, 71, 180],
+            [253, 174, 97, 204],
+            [220, 50, 50, 204]
+          ],
+          colorDomain: [0, MAX_SPEED_MS]
         }));
       }
 
-      if(showEvents){
+      // ——————————————————————————————————————————————————————————————————
+      // 3) Traces Layer
+      if (showTraces) {
+        layers.push(new deck.PathLayer({
+          id: 'denm-traces', data: evs,
+          getPath: d => d.coordinates,
+          getColor: [150, 80, 80],
+          getWidth: 4, widthMinPixels: 2
+        }));
+      }
+
+      // ——————————————————————————————————————————————————————————————————
+      // 4) Events Layer
+      if (showEvents) {
         layers.push(new deck.ScatterplotLayer({
-          id:'denm-points', data,
-          pickable:true,
-          getPosition:d=>d.base,
-          getFillColor:d=>CAUSE_COLOR[d.cause]||CAUSE_COLOR.default,
-          getRadius:20, radiusMinPixels:6,
-          onHover:({object, x, y})=>{
-            if(!object){
-              popupEl.style.display='none';
-              return;
-            }
-            const c=object.cause, sc=object.subCause;
-            const causeText=CAUSE_TEXT[c]||'Unknown';
-            const subText=SUBCAUSE_TEXT[`${c}-${sc}`]||'Unknown';
-            const color=CAUSE_COLOR[c]||CAUSE_COLOR.default;
-            const bg=`rgb(${color.join(',')})`;
-            const dt=new Date(object.timestamp)
-                        .toISOString().slice(0,19).replace('T',' ');
-            popupEl.innerHTML=`
+          id: 'denm-points', data: evs, pickable: true,
+          getPosition: d => d.base,
+          getFillColor: d => (CAUSE_COLOR[d.cause] || CAUSE_COLOR.default),
+          getRadius: 20, radiusMinPixels: 6,
+          onHover: ({ object, x, y }) => {
+            if (!object) { popupEl.style.display = 'none'; return; }
+            const { stationID, stationType, cause, subCause, timestamp } = object;
+            const causeText = CAUSE_TEXT[cause] || 'Unknown';
+            const subText = SUBCAUSE_TEXT[`${cause}-${subCause}`] || 'Unknown';
+            const typeName = STATION_TYPE_NAMES[stationType] || stationType;
+            const clr = CAUSE_COLOR[cause] || CAUSE_COLOR.default;
+            const bg = `rgb(${clr.join(',')})`;
+            const dt = new Date(timestamp)
+              .toISOString().slice(0, 19).replace('T', ' ');
+            popupEl.innerHTML = `
               <div class="popup-card">
                 <div class="popup-header" style="background:${bg};">
                   ${causeText} – ${subText}
                 </div>
                 <div class="popup-body">
-                  <div class="item"><strong>Station ID:</strong> ${object.stationID}</div>
+                  <div class="item"><strong>Station ID:</strong> ${stationID}</div>
+                  <div class="item"><strong>Station Type:</strong> ${typeName}</div>
                   <div class="item"><strong>Time:</strong> ${dt}</div>
                 </div>
               </div>`;
-            popupEl.style.left=`${x+10}px`;
-            popupEl.style.top=`${y+10}px`;
-            popupEl.style.display='block';
+            popupEl.style.left = `${x + 10}px`;
+            popupEl.style.top = `${y + 10}px`;
+            popupEl.style.display = 'block';
           }
         }));
       }
@@ -290,13 +834,22 @@
       deckgl.setProps({ layers });
     }
 
-    function initTabs(){
-      document.getElementById('tabRoad').onclick=()=>location.href='index.html';
-      document.getElementById('tabTraj').onclick=()=>location.href='trajectories.html';
+    function initTabs() {
+      document.getElementById('tabRoad').onclick = () => location.href = 'index.html';
+      document.getElementById('tabTraj').onclick = () => location.href = 'trajectories.html';
       document.getElementById('tabDenm').classList.add('active');
     }
 
     main();
   </script>
 </body>
+
 </html>
+
+
+
+
+
+
+
+
