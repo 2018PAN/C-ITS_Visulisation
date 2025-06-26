@@ -121,6 +121,45 @@
         #viewTabs button+button {
             margin-left: 4px;
         }
+
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            pointer-events: none;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+        #legend h4 {
+            margin: 0 0 12px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        #legend ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        #legend li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+        .legend-line {
+            display: inline-block;
+            width: 24px;
+            height: 4px;
+            margin-right: 8px;
+            border-radius: 2px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 
@@ -150,6 +189,15 @@
     </div>
 
     <div id="map"></div>
+    <div id="legend">
+        <h4 style="margin-top:0;">Link Speed</h4>
+        <ul>
+            <li><span class="legend-line" style="background:rgb(200,80,80)"></span>&lt; 15 km/h</li>
+            <li><span class="legend-line" style="background:rgb(200,120,60)"></span>15 – 30 km/h</li>
+            <li><span class="legend-line" style="background:rgb(180,180,100)"></span>30 – 45 km/h</li>
+            <li><span class="legend-line" style="background:rgb(80,200,80)"></span>> 45 km/h</li>
+        </ul>
+    </div>
     <div id="popup"></div>
 
     <script>
@@ -160,10 +208,11 @@
         }
 
         function getSpeedColor(s) {
-            if (s < 2) return [255, 0, 0];
-            if (s < 6) return [255, 165, 0];
-            if (s < 12) return [255, 255, 0];
-            return [0, 255, 0];
+            const kmh = s * 3.6;
+            if (kmh < 15) return [200, 80, 80];
+            if (kmh < 30) return [200, 120, 60];
+            if (kmh < 45) return [180, 180, 100];
+            return [80, 200, 80];
         }
 
         async function loadAll() {
@@ -294,7 +343,7 @@
                             `<strong>StationID:</strong> ${object.stationID}<br/>` +
                             `<strong>StationType:</strong> ${name}<br/>` +
                             `<strong>Start Time:</strong> ${formatTime(object.timestamp)}<br/>` +
-                            `<strong>Avg Speed:</strong> ${object.speed.toFixed(2)} m/s`;
+                            `<strong>Avg Speed:</strong> ${(object.speed * 3.6).toFixed(2)} km/h`;
                     } else {
                         popup.style.display = 'none';
                     }
