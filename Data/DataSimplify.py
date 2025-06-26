@@ -1,19 +1,10 @@
-#!/usr/bin/env python3
+
 import ijson
 import json
 import os
 
 def process_cam_json_to_array(input_path: str, output_path: str):
-    """
-    读取 input_path（普通 JSON 数组格式），流式提取：
-      - timestamp （毫秒）
-      - stationID
-      - latitude (°)
-      - longitude (°)
-      - stationType
-      - speed_m_s (m/s)
-    并按标准 JSON 数组写入 output_path。
-    """
+
     with open(input_path, 'r', encoding='utf-8') as fin, \
          open(output_path, 'w', encoding='utf-8') as fout:
 

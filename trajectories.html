@@ -128,11 +128,11 @@
 
     <div id="controls">
         <div id="viewTabs">
-            <button id="tabRoad">Road View</button>
+
             <button id="tabTraj" class="active">Trajectory View</button>
-            <button id="tabDenm">DENM View</button>
+            <button id="tabDenm">DashBoard</button>
         </div>
-        <label for="stationType">Station Type:</label>
+        <label for="stationType">Vehicle Type:</label>
         <select id="stationType">
             <option value="all">All</option>
             <option value="5">Passenger Car</option>
@@ -305,26 +305,19 @@
         }
 
         function initTabs() {
-            const tabRoad = document.getElementById('tabRoad');
             const tabTraj = document.getElementById('tabTraj');
             const tabDenm = document.getElementById('tabDenm');
 
-            tabRoad.addEventListener('click', () => {
-                tabRoad.classList.add('active');
-                tabTraj.classList.remove('active');
-                window.location.href = 'index.html';
-            });
+
 
             tabTraj.addEventListener('click', () => {
                 tabTraj.classList.add('active');
                 tabDenm.classList.remove('active');
-                tabRoad.classList.remove('active');
                 window.location.href = 'trajectories.html';
             });
 
             tabDenm.addEventListener('click', () => {
                 tabDenm.classList.add('active');
-                tabRoad.classList.remove('active');
                 tabTraj.classList.remove('active');
                 window.location.href = 'denms.html';
             });

@@ -384,15 +384,16 @@
       margin-top: -8px;
       margin-bottom: 10px;
     }
+
   </style>
 </head>
 
 <body>
   <div id="controls">
     <div id="viewTabs">
-      <button id="tabRoad">Road View</button>
+
       <button id="tabTraj">Trajectory View</button>
-      <button id="tabDenm" class="active">DENM View</button>
+      <button id="tabDenm" class="active">DashBoard</button>
     </div>
 
     <div class="control-group">
@@ -930,7 +931,6 @@
     }
 
     function initTabs() {
-      document.getElementById('tabRoad').onclick = () => location.href = 'index.html';
       document.getElementById('tabTraj').onclick = () => location.href = 'trajectories.html';
       document.getElementById('tabDenm').classList.add('active');
     }
@@ -940,3 +940,7 @@
 </body>
 
 </html>
+
+
+
+
